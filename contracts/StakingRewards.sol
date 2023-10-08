@@ -20,17 +20,17 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
 
     IERC20 public rewardsToken;
     IERC20 public stakingToken;
-    uint256 public periodFinish = 0;
-    uint256 public rewardRate = 0;
-    uint256 public rewardsDuration = 60 days;
-    uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;
+    uint256 public periodFinish = 0; // finish of staking. Initialized by rewards distributor
+    uint256 public rewardRate = 0; // balance / rewardsDuration (kinda reward per second)
+    uint256 public rewardsDuration = 50; // TODO: 60 days 
+    uint256 public lastUpdateTime; // last update of current reward per token stored (check updateReward method) 
+    uint256 public rewardPerTokenStored; // means how much one token 
 
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
+    mapping(address => uint256) public userRewardPerTokenPaid; // actually, it represents previous reward per token
+    mapping(address => uint256) public rewards; // how much staker earned from start to lastUpdateTime
 
-    uint256 private _totalSupply;
-    mapping(address => uint256) private _balances;
+    uint256 private _totalSupply; // in staking tokens
+    mapping(address => uint256) private _balances; // stakers balances in staking tokens
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -42,6 +42,36 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
+    }
+
+    /* ========CUSTOM VIEWS======= */
+
+    function _periodFinish() external view returns (uint256) {
+        return periodFinish;
+    }
+
+    function _lastUpdateTime() external view returns (uint256) {
+        return lastUpdateTime;
+    }
+
+    function _rewardRate() external view returns (uint256) {
+        return rewardRate;
+    } 
+
+    function _rewardPerTokenStored() external view returns (uint256) {
+        return rewardPerTokenStored;
+    }
+
+    function _userRewardPerTokenPaid(address _address) external view returns (uint256) {
+        return userRewardPerTokenPaid[_address];
+    }
+
+    function _rewards(address _address) external view returns (uint256) {
+        return rewards[_address];
+    }
+
+    function _time() external view returns (uint256) {
+        return block.timestamp;
     }
 
     /* ========== VIEWS ========== */
