@@ -102,8 +102,10 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     }
 
     function earned(address account) public view returns (uint256) {
-        // there rewardPerToken() has meaning of how much each token got cost from start of staking and 
-        // userRewardPerTokenPaid[account] means how much each token got cost from start of staking to the last user activity(stake withdraw) 
+        // there rewardPerToken() has meaning of how much reward each staking token got from start of staking and 
+        // userRewardPerTokenPaid[account] means how much reward each token got from start of staking to the last user activity(stake or withdraw)
+        // userRewardPerTokenPaid[account] needed in order to ignore how much reward each staking token got from start of staking to the last user activity(stake or withdraw)
+        // because this user is not related to this reward
         return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
     }
 
