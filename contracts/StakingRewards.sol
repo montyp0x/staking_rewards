@@ -21,10 +21,10 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     IERC20 public rewardsToken;
     IERC20 public stakingToken;
     uint256 public periodFinish = 0; // finish of staking. Initialized by rewards distributor
-    uint256 public rewardRate = 0; // balance / rewardsDuration (kinda reward per second)
+    uint256 public rewardRate = 0; // balance / rewardsDuration (kinda reward for whole pool per second)
     uint256 public rewardsDuration = 50; // TODO: 60 days 
     uint256 public lastUpdateTime; // last update of current reward per token stored (check updateReward method) 
-    uint256 public rewardPerTokenStored; // means how much one token 
+    uint256 public rewardPerTokenStored; // means how much one token cost before last pool change(stake/withdraw)
 
     mapping(address => uint256) public userRewardPerTokenPaid; // actually, it represents previous reward per token
     mapping(address => uint256) public rewards; // how much staker earned from start to lastUpdateTime
@@ -84,7 +84,10 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         return _balances[account];
     }
 
-    function lastTimeRewardApplicable() public view returns (uint256) {
+    function lastTimeRewardApplicable() public view returns (uint256) { 
+        // this function used for rewardPerToken estimation
+        // example: pool balance changes -> rewardPerTokenStored changes -> 
+        // -> program should check how much time there weren't any changes to estimate how much rewards were already distributed
         return Math.min(block.timestamp, periodFinish);
     }
 
