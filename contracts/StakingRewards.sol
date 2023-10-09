@@ -102,6 +102,8 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     }
 
     function earned(address account) public view returns (uint256) {
+        // there rewardPerToken() has meaning of how much each token got cost from start of staking and 
+        // userRewardPerTokenPaid[account] means how much each token got cost from start of staking to the last user activity(stake withdraw) 
         return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
     }
 
@@ -179,7 +181,11 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     /* ========== MODIFIERS ========== */
 
     modifier updateReward(address account) {
-        rewardPerTokenStored = rewardPerToken();
+        rewardPerTokenStored = rewardPerToken(); 
+        // before every pool change contract should fix how many tokens were distributed before this moment
+        // so, it looks at lastTimeRewardApplicable() - lastUpdateTime, to see for what time rewards were distributed
+        // then, contract multiplies this time on rewardRate, divides on _totalSupply and gets how much each token has risen in price 
+        // for last lastTimeRewardApplicable() - lastUpdateTime seconds
         lastUpdateTime = lastTimeRewardApplicable();
         if (account != address(0)) {
             rewards[account] = earned(account);
