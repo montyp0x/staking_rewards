@@ -12,6 +12,9 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IStakingRewards.sol";
 import "./RewardsDistributionRecipient.sol";
 
+//hardhat
+import "hardhat/console.sol";
+
 contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -84,7 +87,7 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         return _balances[account];
     }
 
-    function lastTimeRewardApplicable() public view returns (uint256) { 
+    function lastTimeRewardApplicable() public view returns (uint256) {
         // this function used for rewardPerToken estimation
         // example: pool balance changes -> rewardPerTokenStored changes -> 
         // -> program should check how much time there weren't any changes to estimate how much rewards were already distributed
@@ -193,6 +196,9 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
             rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
+        
+        // console.log(rewardPerTokenStored);
+        // console.log("updateRaward Called: rewardPerTokenStored: %s | lastUpdateTime: %s", rewardPerTokenStored, lastUpdateTime);
         _;
     }
 

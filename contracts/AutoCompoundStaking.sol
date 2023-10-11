@@ -83,8 +83,8 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
         if (_totalSupply == 0) {
             return multiplierStored;
         }
-        console.log("time: ", (lastTimeRewardApplicable() - lastUpdateTime));
-        console.log("TS: ", _totalSupply);
+        // console.log("time: ", (lastTimeRewardApplicable() - lastUpdateTime));
+        // console.log("TS: ", _totalSupply);
         return
             (multiplierStored *
                 (
@@ -94,9 +94,9 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
     }
 
     function earned(address account) public view returns (uint256) {
-        console.log("balance:", _balances[account]);
-        console.log("earned:", (_balances[account] * getMultiplier()) /
-            Math.max(userMultiplierPaid[account], 1e18));
+        // console.log("balance:", _balances[account]);
+        // console.log("earned:", (_balances[account] * getMultiplier()) /
+            // Math.max(userMultiplierPaid[account], 1e18));
         return
             (_balances[account] * getMultiplier()) /
             Math.max(userMultiplierPaid[account], 1e18);
@@ -170,16 +170,16 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
             userMultiplierPaid[account] = multiplierStored;
             lastPoolUpdateTime = lastUpdateTime;
         }
-        console.log("multiplierStored: ", multiplierStored, "\n");
+        // console.log("multiplierStored: ", multiplierStored, "\n");
         // console.log("getMultiplier: ", getMultiplier(), "\n");
-        console.log("_balances[account]:", _balances[account], account, "\n");
-        console.log(
-            "userMultiplierPaid[account]:",
-            userMultiplierPaid[account],
-            "\n"
-        );
+        // console.log("_balances[account]:", _balances[account], account, "\n");
+        // console.log(
+        //     "userMultiplierPaid[account]:",
+        //     userMultiplierPaid[account],
+        //     "\n"
+        // );
 
-        console.log("<----------------------------------->");
+        // console.log("<----------------------------------->");
         _;
     }
 

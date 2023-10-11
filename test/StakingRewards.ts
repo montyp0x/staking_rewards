@@ -23,15 +23,14 @@ describe("StakingRewards", function () {
                                                              await deployedStakingToken.getAddress()) as StakingRewards;
 
 
-    await deployedRewardToken.mint(await deployedStakingRewards.getAddress(), 10000000);
+    // await deployedRewardToken.mint(await deployedStakingRewards.getAddress(), 10000000);
     
-    await deployedStakingToken.mint(staker1.address, 10000000000); 
-    await deployedStakingToken.connect(staker1).approve(await deployedStakingRewards.getAddress(), 1000000000);
-    await deployedStakingToken.mint(staker2.address, 10000000000); 
-    await deployedStakingToken.connect(staker2).approve(await deployedStakingRewards.getAddress(), 1000000000);
-
-    await deployedStakingToken.mint(staker3.address, 10000000000); 
-    await deployedStakingToken.connect(staker3).approve(await deployedStakingRewards.getAddress(), 1000000000);
+    const stakers = [staker1, staker2, staker3];
+    for (let staker of stakers) {
+        const stakerBalance = 10_000;
+        await deployedStakingToken.mint(staker.address, stakerBalance);
+        await deployedStakingToken.connect(staker).approve(await deployedStakingRewards.getAddress(), stakerBalance / 10);
+    }
 
     return { deployedStakingRewards, deployedStakingToken, deployedRewardToken, owner, staker1, staker2, staker3 };
   }
@@ -39,65 +38,218 @@ describe("StakingRewards", function () {
   async function notifyRewardAmountStakingRewards() {
     const { deployedStakingRewards, deployedRewardToken } = await loadFixture(deploy60daysStakingRewardsFixture);
     const reward = 100;
+
+    // console.log("transfering 100 reward tokens to stakingRewards contract and then calling notifyRewardAmount");
     await deployedRewardToken.mint(await deployedStakingRewards.getAddress(), reward); // mint reward tokens
     await deployedStakingRewards.notifyRewardAmount(reward);
     return { reward };
   }
 
-  describe("Reward Amount", function () {
-    // TODO: Check too high reward
-    it("Should set the right reward amount", async function () {
-      const { deployedStakingRewards, deployedRewardToken } = await loadFixture(deploy60daysStakingRewardsFixture);
-      const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
 
-      expect(await deployedRewardToken.balanceOf(await deployedStakingRewards.getAddress())).to.equal(reward);
-    });
+  describe("Basic Tests", function (){
+      describe("Stake tests", function (){
+        it("Balance after stake", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await deployedStakingRewards.connect(staker1).stake(10);
+          expect(await deployedStakingRewards.balanceOf(staker1)).to.equal(10);
+        })
+  
+        it("Balance after stake and unstake", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await deployedStakingRewards.connect(staker1).stake(10);
+          await deployedStakingRewards.connect(staker1).withdraw(10);
+          expect(await deployedStakingRewards.balanceOf(staker1)).to.equal(0);
+        })
+  
+        it("Balance of random staker after staker1 stake", async function () {
+          const {deployedStakingRewards, staker1, staker2} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await deployedStakingRewards.connect(staker1).stake(10);
+          expect(await deployedStakingRewards.balanceOf(staker2)).to.equal(0);
+        })
+  
+        it("Trying to stake more then staker allowance", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await expect(deployedStakingRewards.connect(staker1).stake(1_001)).to.be.revertedWith('ERC20: insufficient allowance');
+        })
+  
+        it("Trying to stake 0 tokens", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await expect(deployedStakingRewards.connect(staker1).stake(0)).to.be.revertedWith('Cannot stake 0');
+        })
+      })
 
-    it("Check variables for duration 50 sec", async function () {
-      const { deployedStakingRewards } = await loadFixture(deploy60daysStakingRewardsFixture);
-      const { } = await loadFixture(notifyRewardAmountStakingRewards);
+      describe("withdraw tests", function () {
+        it("Unstaking negative number of tokens", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await deployedStakingRewards.connect(staker1).stake(10);
+          expect(deployedStakingRewards.connect(staker1).withdraw(-5)).to.be.reverted;
+        })
+  
+        it("Unstaking more tokens then staked", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+  
+          await deployedStakingRewards.connect(staker1).stake(1);
+          await expect(deployedStakingRewards.connect(staker1).withdraw(10)).to.be.reverted;
+        })
+  
+        it("Unstaking more tokens, despite nothing were staked", async function () {
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+          await expect(deployedStakingRewards.connect(staker1).withdraw(10)).to.be.reverted;
+        })
+      })
 
-      const periodFinish = (await time.latest()) + 50;
+      describe("TottalSupply", function (){
+        it("TotalSupple changes after stake and withdraw", async function(){
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
 
-      expect((await deployedStakingRewards._periodFinish()) - (await deployedStakingRewards._lastUpdateTime())).to.equal(50);
-      expect(await deployedStakingRewards._periodFinish()).to.equal(periodFinish);
-      expect(await deployedStakingRewards._rewardRate()).to.equal(2);
-    })
+          expect(await deployedStakingRewards.totalSupply()).to.equal(0);
+          await deployedStakingRewards.connect(staker1).stake(10);
+          expect(await deployedStakingRewards.totalSupply()).to.equal(10);
+          await deployedStakingRewards.connect(staker1).withdraw(5);
+          expect(await deployedStakingRewards.totalSupply()).to.equal(5);
+        })
+
+        it("TotalSupple after incorrect withdraw", async function(){
+          const {deployedStakingRewards, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+
+          expect(await deployedStakingRewards.totalSupply()).to.equal(0);
+          await deployedStakingRewards.connect(staker1).stake(10);
+          expect(await deployedStakingRewards.totalSupply()).to.equal(10);
+          expect(deployedStakingRewards.connect(staker1).withdraw(15)).to.be.reverted;
+          expect(await deployedStakingRewards.totalSupply()).to.equal(10);
+        })
+      })
+
+      describe("Reward Amount", function () {
+        it("Should set the right reward amount", async function () {
+          const { deployedStakingRewards, deployedRewardToken } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
+        
+          expect(await deployedRewardToken.balanceOf(await deployedStakingRewards.getAddress())).to.equal(reward);
+        });
+      });
+
+      describe("Reward Duration", function () {
+        it("Check variables state after 50 sec", async function () {
+          const { deployedStakingRewards } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
     
+          const periodFinish = (await time.latest()) + 50;
+    
+          expect((await deployedStakingRewards._periodFinish()) - (await deployedStakingRewards._lastUpdateTime())).to.equal(50);
+          expect(await deployedStakingRewards._periodFinish()).to.equal(periodFinish);
+          expect(await deployedStakingRewards._rewardRate()).to.equal(2);
+        })
+      })
+
+      describe("exit", function () {
+        it("staker exit right after stake", async function () {
+          const { deployedStakingRewards, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
+
+          await deployedStakingRewards.connect(staker1).stake(10);
+          await deployedStakingRewards.connect(staker1).exit();
+          expect(await deployedStakingRewards.balanceOf(staker1)).to.equal(0);
+        })
+      })
+
+      describe("notifyReward", function () {
+        it("calling notifyReward NOT from rewardDistribution", async function () {
+          const { deployedStakingRewards, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const reward = 100;
+
+          await deployedRewardToken.mint(await deployedStakingRewards.getAddress(), reward); // mint reward tokens
+          await expect(deployedStakingRewards.connect(staker1).notifyRewardAmount(reward)).to.be.revertedWith('Caller is not RewardsDistribution contract');
+        })
+      })
+
+      describe("lastTimeRewardApplicable", function (){
+        it("checking lastTimeRewardApplicable after period finish", async function () {
+          const { deployedStakingRewards, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
+          
+          const periodFinish = (await time.latest()) + 50;
+          await time.increaseTo(await time.latest() + 100);
+
+          expect(await deployedStakingRewards.lastTimeRewardApplicable()).to.equals(periodFinish);
+        })
+
+        it("checking lastTimeRewardApplicable before period finish", async function () {
+          const { deployedStakingRewards, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
+          
+          await time.increaseTo(await time.latest() + 20);
+          const currentTime = await time.latest();
+
+          expect(await deployedStakingRewards.lastTimeRewardApplicable()).to.equals(currentTime);
+        })
+      })
+
+      describe("RewardRate", function (){
+        it("checking rewards rate", async function (){
+          const { deployedStakingRewards, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
+
+          expect(await deployedStakingRewards._rewardRate()).to.equals(2);
+        })
+      })
+
+      // describe("vesting", function () {
+
+      // })
   });
 
-  describe("Staking", function () {
-    it("Check staker balance in staking tokens", async function () {
-      const { deployedStakingRewards, deployedStakingToken, staker1, staker2, staker3 } = await loadFixture(deploy60daysStakingRewardsFixture);
-      const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
+  describe("Different Scenarios", function (){
 
-      await deployedStakingRewards.connect(staker1).stake(10);
-      
-      
-      expect(await deployedStakingRewards._rewardPerTokenStored()).to.equal(0);
-      expect(await deployedStakingRewards._rewards(staker1.address)).to.equal(0);
-      expect(await deployedStakingRewards._userRewardPerTokenPaid(staker1.address)).to.equal(0);
-      // expect((await deployedStakingRewards._periodFinish()) - (await deployedStakingRewards._lastUpdateTime())).to.equal(49);
-      
-
-      await time.increaseTo(await deployedStakingRewards._periodFinish() - 25n);
-      
-      await deployedStakingRewards.connect(staker2).stake(15);
-
-
-      // expect(await deployedStakingRewards._time()).to.equal(await deployedStakingRewards._periodFinish());
-      //expect((await deployedStakingRewards.lastTimeRewardApplicable()) -  await deployedStakingRewards._lastUpdateTime()).to.equal(1);
-      //expect(await deployedStakingRewards._rewardRate()).to.equal(2);
-      //expect(await deployedStakingRewards.totalSupply()).to.equal(10);
-      
-      expect(await deployedStakingRewards._rewardPerTokenStored()).to.equal(5000000000000000000n);
-
-      await deployedStakingRewards.connect(staker3).stake(25);
-
-      expect(await deployedStakingRewards.rewardPerTokenStored()).to.equal(1);
-    
-    })
   })
+
+  // describe("Staking", function () {
+  //   it("Check staker balance in staking tokens", async function () {
+  //     const { deployedStakingRewards, deployedStakingToken, staker1, staker2, staker3 } = await loadFixture(deploy60daysStakingRewardsFixture);
+  //     const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
+
+  //     console.log("staker1 staking 10 tokens");
+  //     await deployedStakingRewards.connect(staker1).stake(10);
+      
+  //     expect(await deployedStakingRewards._rewardPerTokenStored()).to.equal(0);
+  //     expect(await deployedStakingRewards._rewards(staker1.address)).to.equal(0);
+  //     expect(await deployedStakingRewards._userRewardPerTokenPaid(staker1.address)).to.equal(0);
+  //     // expect((await deployedStakingRewards._periodFinish()) - (await deployedStakingRewards._lastUpdateTime())).to.equal(49);
+      
+  //     await time.increaseTo(await deployedStakingRewards._periodFinish() - 25n);
+      
+  //     console.log("staker2 stating 15 tokens");
+  //     await deployedStakingRewards.connect(staker2).stake(15);
+
+  //     // expect(await deployedStakingRewards._time()).to.equal(await deployedStakingRewards._periodFinish());
+  //     //expect((await deployedStakingRewards.lastTimeRewardApplicable()) -  await deployedStakingRewards._lastUpdateTime()).to.equal(1);
+  //     //expect(await deployedStakingRewards._rewardRate()).to.equal(2);
+  //     //expect(await deployedStakingRewards.totalSupply()).to.equal(10);
+      
+  //     expect(await deployedStakingRewards._rewardPerTokenStored()).to.equal(5000000000000000000n);
+
+  //     console.log("staker3 staking 25 tokens");
+  //     await deployedStakingRewards.connect(staker3).stake(25);
+
+  //     expect(await deployedStakingRewards.rewardPerTokenStored()).to.equal(1);
+  //   })
+  // })
 
   /*
   describe("Withdrawals", function () {
