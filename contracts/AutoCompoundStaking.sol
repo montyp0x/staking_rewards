@@ -15,6 +15,10 @@ import "hardhat/console.sol";
 contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /* ========== ACCURACY CONSTS ========== */
+
+    uint256 public AMOUNT_MULTIPLIER = 1e4;
+
     /* ========== STATE VARIABLES ========== */
 
     IERC20 public stakingToken;
@@ -68,11 +72,11 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
     /* ========== VIEWS ========== */
 
     function totalSupply() external view returns (uint256) {
-        return _totalSupply;
+        return _totalSupply / AMOUNT_MULTIPLIER;
     }
 
     function balanceOf(address account) external view returns (uint256) {
-        return _balances[account];
+        return _balances[account] / AMOUNT_MULTIPLIER;
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
@@ -83,8 +87,7 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
         if (_totalSupply == 0) {
             return multiplierStored;
         }
-        // console.log("time: ", (lastTimeRewardApplicable() - lastUpdateTime));
-        // console.log("TS: ", _totalSupply);
+        
         return
             (multiplierStored *
                 (
@@ -94,9 +97,13 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
     }
 
     function earned(address account) public view returns (uint256) {
-        // console.log("balance:", _balances[account]);
+        // console.log("earned.balance:", _balances[account]);
+        // console.log("earned.uMP: ", userMultiplierPaid[account]);
+        // console.log("earned.getMult: ", getMultiplier());
+
         // console.log("earned:", (_balances[account] * getMultiplier()) /
-            // Math.max(userMultiplierPaid[account], 1e18));
+        //     Math.max(userMultiplierPaid[account], 1e18));
+        
         return
             (_balances[account] * getMultiplier()) /
             Math.max(userMultiplierPaid[account], 1e18);
@@ -108,8 +115,8 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
         uint256 amount
     ) external nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply + amount * 1e4;
-        _balances[msg.sender] = _balances[msg.sender] + amount;
+        _totalSupply = _totalSupply + amount * AMOUNT_MULTIPLIER;
+        _balances[msg.sender] = _balances[msg.sender] + amount * AMOUNT_MULTIPLIER;
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
@@ -118,15 +125,21 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
         uint256 amount
     ) public nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply - amount * 1e4;
-        _balances[msg.sender] = _balances[msg.sender] - amount;
+        _totalSupply = _totalSupply - amount * AMOUNT_MULTIPLIER;
+
+        if (_balances[msg.sender] < AMOUNT_MULTIPLIER) {
+            _balances[msg.sender] = 0;
+        }
+        
+        _balances[msg.sender] = _balances[msg.sender] - amount * AMOUNT_MULTIPLIER;
         stakingToken.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
 
     function exit() external {
-        withdraw(_balances[msg.sender]);
+        withdraw(_balances[msg.sender] / AMOUNT_MULTIPLIER);
     }
+
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
@@ -151,6 +164,7 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
             "Provided reward too high"
         );
 
+        rewardRate *= AMOUNT_MULTIPLIER;
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp + rewardsDuration;
         emit RewardAdded(reward);
@@ -163,13 +177,14 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
         lastUpdateTime = lastTimeRewardApplicable();
 
         if (account != address(0)) {
-            _balances[account] += earned(account);
+            _balances[account] = earned(account);
             _totalSupply +=
                 (lastTimeRewardApplicable() - Math.min(lastPoolUpdateTime, lastUpdateTime)) *
-                rewardRate * 1e4;
+                rewardRate;
             userMultiplierPaid[account] = multiplierStored;
             lastPoolUpdateTime = lastUpdateTime;
         }
+        // console.log("_totalSupply: ", _totalSupply);
         // console.log("multiplierStored: ", multiplierStored, "\n");
         // console.log("getMultiplier: ", getMultiplier(), "\n");
         // console.log("_balances[account]:", _balances[account], account, "\n");

@@ -10,6 +10,7 @@ import {
   describe("StakingRewards", function () {
     async function deploy60daysStakingRewardsFixture() {
       const [owner, staker1, staker2, staker3] = await ethers.getSigners();
+      const AMOUNT_MULTIPLIER = 10_000;
   
       const Token = await ethers.getContractFactory("Token");
       const ACS = await ethers.getContractFactory("AutoCompoundStaking");
@@ -22,55 +23,55 @@ import {
   
       const stakers = [staker1, staker2, staker3];
       for (let staker of stakers) {
-          const stakerBalance = 10_000;
+          const stakerBalance = ethers.parseEther("10");
           await deployedStakingToken.mint(staker.address, stakerBalance);
-          await deployedStakingToken.connect(staker).approve(await deployedACS.getAddress(), stakerBalance / 10);
+          await deployedStakingToken.connect(staker).approve(await deployedACS.getAddress(), stakerBalance / 10n);
       }
   
-      return { deployedACS, deployedStakingToken, owner, staker1, staker2, staker3 };
+      return { deployedACS, deployedStakingToken, owner, staker1, staker2, staker3, AMOUNT_MULTIPLIER };
     }
   
     async function notifyRewardAmountStakingRewards() {
-      const { deployedACS, deployedStakingToken, owner } = await loadFixture(deploy60daysStakingRewardsFixture);
-      const reward = 100;
+      const { deployedACS, deployedStakingToken } = await loadFixture(deploy60daysStakingRewardsFixture);
+      const reward = 1000;
+      const duration = 50;
       await deployedStakingToken.mint(await deployedACS.getAddress(), reward); // mint reward tokens
       await deployedACS.notifyRewardAmount(reward);
-      return { reward };
+      return { reward, duration };
     }
   
-    describe("Reward Amount", function () {
-      // TODO: Check too high reward
-      it("Should set the right reward amount", async function () {
-        const { deployedACS, deployedStakingToken } = await loadFixture(deploy60daysStakingRewardsFixture);
-        const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
+    // describe("Reward Amount", function () {
+    //   // TODO: Check too high reward
+    //   it("Should set the right reward amount", async function () {
+    //     const { deployedACS, deployedStakingToken } = await loadFixture(deploy60daysStakingRewardsFixture);
+    //     const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
   
-        expect(await deployedStakingToken.balanceOf(await deployedACS.getAddress())).to.equal(reward);
-      });
+    //     expect(await deployedStakingToken.balanceOf(await deployedACS.getAddress())).to.equal(reward);
+    //   });
   
-      it("Check variables for duration 50 sec", async function () {
-        const { deployedACS } = await loadFixture(deploy60daysStakingRewardsFixture);
-        const { } = await loadFixture(notifyRewardAmountStakingRewards);
+    //   it("Check variables for duration 50 sec", async function () {
+    //     const { deployedACS, AMOUNT_MULTIPLIER} = await loadFixture(deploy60daysStakingRewardsFixture);
+    //     const { } = await loadFixture(notifyRewardAmountStakingRewards);
   
-        const periodFinish = (await time.latest()) + 50;
+    //     const periodFinish = (await time.latest()) + 50;
   
-        expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50);
-        expect(await deployedACS._periodFinish()).to.equal(periodFinish);
-        expect(await deployedACS._rewardRate()).to.equal(2);
-      })
+    //     expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50);
+    //     expect(await deployedACS._periodFinish()).to.equal(periodFinish);
+    //     expect(await deployedACS._rewardRate()).to.equal(2 * AMOUNT_MULTIPLIER);
+    //   })
       
-    });
+    // });
   
     describe("Staking", function () {
-      it("Check staker balance in staking tokens", async function () {
+      it("Check the staker balance in staking tokens", async function () {
         const { deployedACS, deployedStakingToken, staker1, staker2, staker3 } = await loadFixture(deploy60daysStakingRewardsFixture);
         const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
   
-        await deployedACS.connect(staker1).stake(10);
-        
-        
-        expect(await deployedACS._multiplierStored()).to.equal(1000000000000000000n);
+        await deployedACS.connect(staker1).stake(10n);
+        const One18 = 1000000000000000000n;
+        expect(await deployedACS._multiplierStored()).to.equal(One18);
         // expect(await deployedACS._balance(staker1.address)).to.equal(0);
-        expect(await deployedACS._userMultiplierPaid(staker1.address)).to.equal(1000000000000000000n);
+        expect(await deployedACS._userMultiplierPaid(staker1.address)).to.equal(One18);
         // expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(49);
         
         await time.increaseTo(await deployedACS._periodFinish() - 25n);
@@ -85,7 +86,7 @@ import {
         // expect(await deployedACS._multiplierStored()).to.equal(6000000000000000000n);
 
         await time.increaseTo(await deployedACS._periodFinish());
-  
+
         await deployedACS.connect(staker1).exit();
         await deployedACS.connect(staker2).exit();      
       })
@@ -94,7 +95,7 @@ import {
     describe("Basic Tests", function (){
       describe("Stake tests", function (){
         it("Balance after stake", async function () {
-          const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {deployedACS, staker1, AMOUNT_MULTIPLIER} = await loadFixture(deploy60daysStakingRewardsFixture);
           const {} = await loadFixture(notifyRewardAmountStakingRewards);
   
           await deployedACS.connect(staker1).stake(10);
@@ -105,9 +106,13 @@ import {
           const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
           const {} = await loadFixture(notifyRewardAmountStakingRewards);
   
-          await deployedACS.connect(staker1).stake(10);
-          await deployedACS.connect(staker1).withdraw(10);
-          expect(await deployedACS.balanceOf(staker1)).to.equal(0);
+          await deployedACS.connect(staker1).stake(ethers.parseEther("0.5"));
+          
+          await time.increaseTo(await deployedACS._periodFinish() + 100n);
+
+          await deployedACS.connect(staker1).withdraw(ethers.parseEther("0.5"));
+
+          expect(await deployedACS.balanceOf(staker1)).to.be.approximately(0, 1000);
         })
   
         it("Balance of random staker after staker1 stake", async function () {
@@ -119,10 +124,10 @@ import {
         })
   
         it("Trying to stake more then staker allowance", async function () {
-          const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {deployedACS,deployedStakingToken, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
           const {} = await loadFixture(notifyRewardAmountStakingRewards);
   
-          await expect(deployedACS.connect(staker1).stake(1_001)).to.be.revertedWith('ERC20: insufficient allowance');
+          await expect(deployedACS.connect(staker1).stake(await deployedStakingToken.allowance(staker1, deployedACS) + 1n)).to.be.revertedWith('ERC20: insufficient allowance');
         })
   
         it("Trying to stake 0 tokens", async function () {
@@ -133,104 +138,115 @@ import {
         })
       })
 
-      // describe("withdraw tests", function () {
-      //   it("Unstaking negative number of tokens", async function () {
-      //     const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const {} = await loadFixture(notifyRewardAmountStakingRewards);
+      describe("withdraw tests", function () {
+        it("Unstaking negative number of tokens", async function () {
+          const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
   
-      //     await deployedACS.connect(staker1).stake(10);
-      //     expect(deployedACS.connect(staker1).withdraw(-5)).to.be.reverted;
-      //   })
+          await deployedACS.connect(staker1).stake(10);
+          expect(deployedACS.connect(staker1).withdraw(-5)).to.be.reverted;
+        })
   
-      //   it("Unstaking more tokens then staked", async function () {
-      //     const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const {} = await loadFixture(notifyRewardAmountStakingRewards);
+        it("Unstaking more tokens then staked", async function () {
+          const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
   
-      //     await deployedACS.connect(staker1).stake(1);
-      //     await expect(deployedACS.connect(staker1).withdraw(10)).to.be.reverted;
-      //   })
+          await deployedACS.connect(staker1).stake(ethers.parseEther("0.1"));
+          await expect(deployedACS.connect(staker1).withdraw(ethers.parseEther("0.8"))).to.be.reverted;
+        })
   
-      //   it("Unstaking more tokens, despite nothing were staked", async function () {
-      //     const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const {} = await loadFixture(notifyRewardAmountStakingRewards);
-      //     await expect(deployedACS.connect(staker1).withdraw(10)).to.be.reverted;
-      //   })
-      // })
+        it("Unstaking more tokens, despite nothing were staked", async function () {
+          const {deployedACS, staker1} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {} = await loadFixture(notifyRewardAmountStakingRewards);
+          await expect(deployedACS.connect(staker1).withdraw(10)).to.be.reverted;
+        })
+      })
 
-      // describe("Reward Amount", function () {
-      //   // TODO: Check too high reward
-      //   it("Should set the right reward amount", async function () {
-      //     const { deployedACS, deployedRewardToken } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
-        
-      //     expect(await deployedRewardToken.balanceOf(await deployedACS.getAddress())).to.equal(reward);
-      //   });
-      // });
-
-      // describe("Reward Duration", function () {
-      //   it("Check variables state after 50 sec", async function () {
-      //     const { deployedACS } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const { } = await loadFixture(notifyRewardAmountStakingRewards);
+      describe("Reward Amount", function () {
+        // TODO: Check too high reward
+        it("Should set the right reward amount", async function () {
+          const { deployedACS, deployedStakingToken } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { reward } = await loadFixture(notifyRewardAmountStakingRewards);
     
-      //     const periodFinish = (await time.latest()) + 50;
+          expect(await deployedStakingToken.balanceOf(await deployedACS.getAddress())).to.equal(reward);
+        });
     
-      //     expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50);
-      //     expect(await deployedACS._periodFinish()).to.equal(periodFinish);
-      //     expect(await deployedACS._rewardRate()).to.equal(2);
-      //   })
-      // })
+        it("Check variables for duration 50 sec", async function () {
+          const { deployedACS, AMOUNT_MULTIPLIER} = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { reward, duration } = await loadFixture(notifyRewardAmountStakingRewards);
+    
+          const periodFinish = (await time.latest()) + 50;
+    
+          expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50);
+          expect(await deployedACS._periodFinish()).to.equal(periodFinish);
+          expect(await deployedACS._rewardRate()).to.equal((reward / duration) * AMOUNT_MULTIPLIER);
+        })
+      });
 
-      // describe("exit", function () {
-      //   it("staker exit right after stake", async function () {
-      //     const { deployedACS, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const { } = await loadFixture(notifyRewardAmountStakingRewards);
+      describe("Reward Duration", function () {
+        it("Check variables state after 50 sec", async function () {
+          const { deployedACS, AMOUNT_MULTIPLIER } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { reward, duration } = await loadFixture(notifyRewardAmountStakingRewards);
+    
+          const periodFinish = (await time.latest()) + 50;
+    
+          expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50);
+          expect(await deployedACS._periodFinish()).to.equal(periodFinish);
+          expect(await deployedACS._rewardRate()).to.equal((reward / duration) * AMOUNT_MULTIPLIER);
+        })
+      })
 
-      //     await deployedACS.connect(staker1).stake(10);
-      //     await deployedACS.connect(staker1).exit();
-      //     expect(await deployedACS.balanceOf(staker1)).to.equal(0);
-      //   })
-      // })
+      describe("exit", function () {
+        it("staker exit right after stake", async function () {
+          const { deployedACS, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
 
-      // describe("notifyReward", function () {
-      //   it("calling notifyReward NOT from rewardDistribution", async function () {
-      //     const { deployedACS, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const reward = 100;
+          await deployedACS.connect(staker1).stake(ethers.parseEther("0.01"));
+          await deployedACS.connect(staker1).exit();
+          expect(await deployedACS.balanceOf(staker1)).to.be.approximately(0n, 100);
+        })
+      })
 
-      //     await deployedRewardToken.mint(await deployedACS.getAddress(), reward); // mint reward tokens
-      //     await expect(deployedACS.connect(staker1).notifyRewardAmount(reward)).to.be.revertedWith('Caller is not RewardsDistribution contract');
-      //   })
-      // })
+      describe("notifyReward", function () {
+        it("calling notifyReward NOT from rewardDistribution", async function () {
+          const { deployedACS, deployedStakingToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const reward = 100;
 
-      // describe("lastTimeRewardApplicable", function (){
-      //   it("checking lastTimeRewardApplicable after period finish", async function () {
-      //     const { deployedACS, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const { } = await loadFixture(notifyRewardAmountStakingRewards);
+          await deployedStakingToken.mint(await deployedACS.getAddress(), reward); // mint reward tokens
+          await expect(deployedACS.connect(staker1).notifyRewardAmount(reward)).to.be.revertedWith('Caller is not RewardsDistribution contract');
+        })
+      })
+
+      describe("lastTimeRewardApplicable", function (){
+        it("checking lastTimeRewardApplicable after period finish", async function () {
+          const { deployedACS, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
           
-      //     const periodFinish = (await time.latest()) + 50;
-      //     await time.increaseTo(await time.latest() + 100);
+          const periodFinish = (await time.latest()) + 50;
+          await time.increaseTo(await time.latest() + 100);
 
-      //     expect(await deployedACS.lastTimeRewardApplicable()).to.equals(periodFinish);
-      //   })
+          expect(await deployedACS.lastTimeRewardApplicable()).to.equals(periodFinish);
+        })
 
-      //   it("checking lastTimeRewardApplicable before period finish", async function () {
-      //     const { deployedACS, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const { } = await loadFixture(notifyRewardAmountStakingRewards);
+        it("checking lastTimeRewardApplicable before period finish", async function () {
+          const { deployedACS, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const { } = await loadFixture(notifyRewardAmountStakingRewards);
           
-      //     await time.increaseTo(await time.latest() + 20);
-      //     const currentTime = await time.latest();
+          await time.increaseTo(await time.latest() + 20);
+          const currentTime = await time.latest();
 
-      //     expect(await deployedACS.lastTimeRewardApplicable()).to.equals(currentTime);
-      //   })
-      // })
+          expect(await deployedACS.lastTimeRewardApplicable()).to.equals(currentTime);
+        })
+      })
 
-      // describe("RewardRate", function (){
-      //   it("checking rewards rate", async function (){
-      //     const { deployedACS, deployedRewardToken, staker1 } = await loadFixture(deploy60daysStakingRewardsFixture);
-      //     const { } = await loadFixture(notifyRewardAmountStakingRewards);
+      describe("RewardRate", function (){
+        it("checking rewards rate", async function (){
+          const { deployedACS, AMOUNT_MULTIPLIER } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {reward, duration } = await loadFixture(notifyRewardAmountStakingRewards);
 
-      //     expect(await deployedACS._rewardRate()).to.equals(2);
-      //   })
-      // })
+          expect(await deployedACS._rewardRate()).to.equals((reward / duration) * AMOUNT_MULTIPLIER);
+        })
+      })
 
       // describe("vesting", function () {
 

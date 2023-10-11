@@ -9,6 +9,7 @@
     "@openzeppelin/contracts": "^4.9.3",
     "@typechain/ethers-v6": "^0.5.0",
     "@typechain/hardhat": "^9.0.0",
+    "@types/mocha": "^10.0.2",
     "chai": "^4.3.10",
     "ethers": "^6.7.1",
     "hardhat": "^2.18.0",
