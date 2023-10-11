@@ -87,7 +87,6 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
         if (_totalSupply == 0) {
             return multiplierStored;
         }
-        
         return
             (multiplierStored *
                 (
@@ -97,13 +96,6 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
     }
 
     function earned(address account) public view returns (uint256) {
-        console.log("earned.balance:", _balances[account]);
-        console.log("earned.uMP: ", userMultiplierPaid[account]);
-        console.log("earned.getMult: ", getMultiplier());
-
-        console.log("earned:", (_balances[account] * getMultiplier()) /
-            Math.max(userMultiplierPaid[account], 1e18));
-        
         return
             (_balances[account] * getMultiplier()) /
             Math.max(userMultiplierPaid[account], 1e18);
@@ -178,17 +170,6 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
             userMultiplierPaid[account] = multiplierStored;
             lastPoolUpdateTime = lastUpdateTime;
         }
-        console.log("_totalSupply: ", _totalSupply);
-        console.log("multiplierStored: ", multiplierStored, "\n");
-        // console.log("getMultiplier: ", getMultiplier(), "\n");
-        console.log("_balances[account]:", _balances[account], account, "\n");
-        console.log(
-            "userMultiplierPaid[account]:",
-            userMultiplierPaid[account],
-            "\n"
-        );
-
-        console.log("<----------------------------------->");
         _;
     }
 
