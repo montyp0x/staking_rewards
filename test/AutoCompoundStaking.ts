@@ -10,8 +10,7 @@ import {
   describe("StakingRewards", function () {
     async function deploy60daysStakingRewardsFixture() {
       const [owner, staker1, staker2, staker3] = await ethers.getSigners();
-      const AMOUNT_MULTIPLIER = 10_000;
-  
+
       const Token = await ethers.getContractFactory("Token");
       const ACS = await ethers.getContractFactory("AutoCompoundStaking");
   
@@ -21,6 +20,7 @@ import {
       const deployedACS = await ACS.deploy(await owner.getAddress(),
                                                                await deployedStakingToken.getAddress()) as AutoCompoundStaking;
   
+      const AMOUNT_MULTIPLIER = await deployedACS._AMOUNT_MULTIPLIER();
       const stakers = [staker1, staker2, staker3];
       for (let staker of stakers) {
           const stakerBalance = ethers.parseEther("10");
@@ -33,8 +33,8 @@ import {
   
     async function notifyRewardAmountStakingRewards() {
       const { deployedACS, deployedStakingToken } = await loadFixture(deploy60daysStakingRewardsFixture);
-      const reward = 1000;
-      const duration = 50;
+      const reward = 1000n;
+      const duration = await deployedACS._rewardsDuration();
       await deployedStakingToken.mint(await deployedACS.getAddress(), reward); // mint reward tokens
       await deployedACS.notifyRewardAmount(reward);
       return { reward, duration };
@@ -190,7 +190,7 @@ import {
     
           const periodFinish = (await time.latest()) + 50;
     
-          expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50);
+          expect((await deployedACS._periodFinish()) - (await deployedACS._lastUpdateTime())).to.equal(50n);
           expect(await deployedACS._periodFinish()).to.equal(periodFinish);
           expect(await deployedACS._rewardRate()).to.equal((reward / duration) * AMOUNT_MULTIPLIER);
         })
@@ -252,8 +252,21 @@ import {
 
       // })
   });
+
+  describe("Corner Cases", function() {
+    describe("big numbers", function (){
+      it("Big Reward", async function (){
+        it("checking rewards rate", async function (){
+          const { deployedACS, AMOUNT_MULTIPLIER } = await loadFixture(deploy60daysStakingRewardsFixture);
+          const {reward, duration } = await loadFixture(notifyRewardAmountStakingRewards);
+
+          expect(await deployedACS._rewardRate()).to.equals((reward / duration) * AMOUNT_MULTIPLIER);
+        })
+      })
+    })
+  })
   
-    /*
+    /* 
     describe("Withdrawals", function () {
       describe("Validations", function () {
         it("Should revert with the right error if called too soon", async function () {

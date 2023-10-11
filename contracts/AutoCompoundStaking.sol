@@ -43,6 +43,14 @@ contract AutoCompoundStaking is RewardsDistributionRecipient, ReentrancyGuard {
 
     /* ========CUSTOM VIEWS======= */
 
+    function _rewardsDuration() external view returns (uint256) {
+        return rewardsDuration;
+    }
+
+    function _AMOUNT_MULTIPLIER() external view returns (uint256) {
+        return AMOUNT_MULTIPLIER;
+    }
+
     function _periodFinish() external view returns (uint256) {
         return periodFinish;
     }
